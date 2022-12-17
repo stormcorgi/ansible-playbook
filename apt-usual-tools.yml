@@ -1,0 +1,22 @@
+---
+- hosts: servers
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: set timezone asia/tokyo
+      ansible.builtin.shell: timedatectl set-timezone Asia/Tokyo
+    - name: Install APT packages 
+      ansible.builtin.apt:
+        pkg:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - screenfetch
+          - git
+          - dnsutils
+          - tmux
+          - python3-pip
+        update_cache: yes
+        cache_valid_time: 86400 # cache for 1 day

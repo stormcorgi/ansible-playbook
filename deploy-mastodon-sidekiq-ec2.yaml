@@ -1,0 +1,100 @@
+---
+- hosts: "{{ target_hosts  }}"
+  gather_facts: true
+  vars:
+    ansible_user: admin
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+
+  tasks:
+    # - name: generate swapfile
+    #   ansible.builtin.shell:
+    #     cmd: "dd if=/dev/zero of=/swapfile bs=1M count=1024"
+    #     creates: /swapfile
+    #   become: true
+    # - name: chmod swapfile
+    #   file: path=/swapfile mode=0600
+    #   become: true
+    # - name: conv swapfile onto swap usable file
+    #   ansible.builtin.shell: mkswap /swapfile
+    #   become: true
+    # - name: enable swap
+    #   ansible.builtin.shell: swapon /swapfile
+    #   become: true
+    # - name: write fstab
+    #   lineinfile:
+    #     dest=/etc/fstab
+    #     line="/swapfile swap swap defaults 0 0"
+    #   become: true
+
+    - name: Install APT packages to use a repository over HTTPS
+      ansible.builtin.apt:
+        pkg:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        update_cache: yes
+        cache_valid_time: 86400 # cache for 1 day
+      become: true
+    - name: Create APT's keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+      become: true
+    - name: Add Docker's official GPG key
+      ansible.builtin.shell: 
+        cmd: "curl -fsSL https://download.docker.com/linux/{{ansible_distribution | lower}}/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg"
+        creates: /etc/apt/keyrings/docker.gpg
+      become: true
+    - name: Setup the repository
+      shell: >
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ansible_distribution | lower}} $(lsb_release -cs) stable"
+          | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      become: true
+    - name: update cache
+      ansible.builtin.apt:
+        update_cache: yes
+      become: true
+    - name: Install Docker
+      ansible.builtin.apt:
+        pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose
+          - docker-compose-plugin
+        update_cache: yes
+      become: true
+    - name: Start Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+      become: true
+    - name: add user to docker group
+      ansible.builtin.user:
+        name: "{{ansible_user_id}}"
+        groups: docker
+        append: yes
+      become: true
+
+    - name: copy .env.production
+      ansible.builtin.copy:
+        src: /home/motcha/ansible/mastodon/env.production-ec2
+        dest: ~/.env.production
+
+    - name: copy sidekiq.yml
+      ansible.builtin.copy:
+        src: /home/motcha/ansible/mastodon/push.yml
+        dest: ~/docker-compose.yml
+
+    - name: pull containers image
+      ansible.builtin.shell: docker-compose pull
+
+    - name: up containers
+      community.docker.docker_compose:
+        project_src: ~/
+      register: output
+
+    - debug:
+        msg: "{{output}}"
+

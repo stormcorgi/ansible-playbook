@@ -1,0 +1,32 @@
+---
+- hosts: "{{ target_host  }}"
+  gather_facts: false
+
+  tasks:
+    - name: Create mastodon dir
+      ansible.builtin.file:
+        path: ~/mastodon
+        state: directory
+
+    - name: copy .env.production
+      ansible.builtin.copy:
+        src: /home/motcha/ansible/mastodon/env.production
+        dest: ~/mastodon/.env.production
+
+    - name: copy sidekiq.yml
+      ansible.builtin.copy:
+        src: /home/motcha/ansible/mastodon/sidekiq.yml
+        dest: ~/mastodon/docker-compose.yml
+
+    - name: pull containers image
+      ansible.builtin.shell: docker-compose pull
+      args:
+        chdir: ~/mastodon
+
+    - name: up containers
+      community.docker.docker_compose:
+        project_src: ~/mastodon
+      register: output
+
+    - debug:
+        msg: "{{output}}"

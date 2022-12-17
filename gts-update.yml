@@ -1,0 +1,65 @@
+---
+- hosts: gotosocial
+  vars:
+      live_path: /gotosocial
+  become: true
+  become_method: sudo
+  become_user: root
+  gather_facts: false
+
+  tasks:
+    - name: get current tag
+      shell: "/gotosocial/gotosocial -v | sed -e 's/^.*ion /v/g' -e 's/ git-.*//g'"
+      changed_when: False
+      register: current_binary
+    - debug: msg='current_binary {{ current_binary.stdout }}'
+
+    - name: get latest tag
+      uri:
+        url : https://api.github.com/repos/superseriousbusiness/gotosocial/releases/latest
+        return_content: true
+      register: json_response
+    - debug: msg='latest_binary {{ json_response.json.tag_name }}'
+
+    - name: end task when tag is same
+      meta: end_play
+      when: current_binary.stdout == json_response.json.tag_name
+
+    - name: "toot:start"
+      shell: "/usr/local/bin/toot post 'GoToSocial 鯖缶びちびち... {{  json_response.json.tag_name }}'"
+
+    - name: install arm64 {{ json_response.json.tag_name}}
+      loop: "{{ json_response.json.assets }}"
+      when: "'arm64' in item.name"
+      unarchive:
+        remote_src: yes
+        src: "{{ item.browser_download_url }}"
+        dest: "/gotosocial"
+        owner: gotosocial
+        group: gotosocial
+        keep_newer: yes
+        backup: yes
+        # extra_opts:
+        # - --no-anchored
+        # - gotosocial
+      register: binary
+
+    - debug: msg='new file found! {{ binary.changed }}'
+
+    - name: "toot:restart"
+      shell: "/usr/local/bin/toot post '再起動ッ！突っ込むぞッ！'"
+    
+    - name: restart gotosocial.service
+      ansible.builtin.service:
+          name: gotosocial
+          state: restarted
+      become: true
+      become_method: sudo
+      become_user: root
+    
+    - name: sleep 10 sec
+      ansible.builtin.wait_for:
+          timeout: 10
+
+    - name: "toot:done"
+      shell: "/usr/local/bin/toot post ':dogcited: @mot 完了！！！ :dogcited:'"

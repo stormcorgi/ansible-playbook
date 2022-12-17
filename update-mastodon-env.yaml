@@ -1,0 +1,21 @@
+---
+- hosts: mastodon_sidekiqs
+  gather_facts: false
+
+  tasks:
+    - name: Create mastodon dir
+      ansible.builtin.file:
+        path: ~/mastodon
+        state: directory
+
+    - name: copy .env.production
+      ansible.builtin.copy:
+        src: /home/motcha/git/mastodon/.env.production
+        dest: ~/mastodon/.env.production
+
+    - name: up containers
+      community.docker.docker_compose:
+        project_src: ~/mastodon
+        build: false
+        restarted: true
+

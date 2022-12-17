@@ -1,0 +1,28 @@
+---
+- hosts: setup_targets
+  gather_facts: false
+  become: true
+
+#FIXME: its not idempotency
+
+  tasks:
+    - name: generate swapfile
+      ansible.builtin.shell:
+        cmd: "dd if=/dev/zero of=/swapfile bs=1M count=2048"
+        creates: /swapfile
+
+    - name: chmod swapfile
+      file: path=/swapfile mode=0600
+      
+    - name: conv swapfile onto swap usable file
+      ansible.builtin.shell: mkswap /swapfile
+
+    - name: enable swap
+      ansible.builtin.shell: swapon /swapfile
+
+    - name: write fstab
+      lineinfile:
+        dest=/etc/fstab
+        line="/swapfile swap swap defaults 0 0"
+
+

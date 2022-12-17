@@ -1,0 +1,106 @@
+---
+- hosts: mastodon
+  environment:
+      NODE_OPTIONS: "--openssl-legacy-provider"
+      RAILS_ENV: "production"
+  vars:
+      live_path: /home/mastodon/live
+  become: true
+  become_method: sudo
+  become_user: mastodon
+  tasks:
+    - name: "toot:start"
+      shell: "/home/mastodon/.local/bin/toot post '鯖缶びちびち、やるぞ！'"
+    - name: Git clone
+      ansible.builtin.git:
+        repo: https://github.com/mastodon/mastodon.git
+        dest: "{{ live_path }}"
+    - name: Fetch Latest Tag
+      shell: "git fetch --tags"
+      args:
+        chdir: "{{ live_path }}"
+    - name: Set Latest Tag to Variable.
+      shell: "git describe --tags `git rev-list --tags --max-count=1`"
+      args:
+        chdir: "{{ live_path }}"
+      register:
+          latest_tag
+    - name: "toot:latest-tag"
+      shell: "/home/mastodon/.local/bin/toot post '対象タグ:{{ latest_tag.stdout }}'"
+    - name: Git checkout Latest Tag
+      ansible.builtin.git:
+        repo: https://github.com/mastodon/mastodon.git
+        dest: "{{ live_path }}"
+        version: "{{ latest_tag.stdout }}"
+    - name: "toot:bundle"
+      shell: "/home/mastodon/.local/bin/toot post 'bundle install...'"
+    - name: bundle tasks
+      block:
+        - name: bundle install
+          shell: "/home/mastodon/.rbenv/shims/bundle install"
+          args:
+              chdir: "{{ live_path }}"
+          register: result
+      rescue:
+        - name: "toot:failed-bundle"
+          shell: "/home/mastodon/.local/bin/toot post 'failed :('"
+        - meta: end_play
+    
+    - name: yarn tasks
+      block:
+        - name: "toot:yarn"
+          shell: "/home/mastodon/.local/bin/toot post 'yarn install...'"
+        - name: yarn install
+          shell: "/usr/bin/yarn install"
+          args:
+              chdir: "{{ live_path }}"
+          register: result
+      rescue:
+        - name: "toot:failed-yarn"
+          shell: "/home/mastodon/.local/bin/toot post 'failed :('"
+        - meta: end_play
+    
+    - name: precompile
+      block:
+        - name: toot:precompile
+          shell: "/home/mastodon/.local/bin/toot post 'precompile中…(重たくなります)'"
+        - name: rails assets:precompile
+          shell: "/home/mastodon/.rbenv/shims/bundle exec rails assets:precompile"
+          args:
+              chdir: "{{ live_path }}"
+      rescue:
+        - name: "toot:failed-precompile"
+          shell: "/home/mastodon/.local/bin/toot post 'failed :('"
+        - meta: end_play
+    
+    
+    - name: "toot:restart"
+      shell: "/home/mastodon/.local/bin/toot post '再起動ッ！突っ込むぞッ！'"
+    
+    - name: restart mastodon-web service
+      ansible.builtin.service:
+          name: mastodon-web
+          state: restarted
+      become: true
+      become_method: sudo
+      become_user: root
+    - name: restart mastodon-streaming service
+      ansible.builtin.service:
+          name: mastodon-streaming
+          state: restarted
+      become: true
+      become_method: sudo
+      become_user: root
+    - name: restart mastodon-sidekiq service
+      ansible.builtin.service:
+          name: mastodon-sidekiq
+          state: restarted
+      become: true
+      become_method: sudo
+      become_user: root
+    
+    - name: sleep 60 sec
+      ansible.builtin.wait_for:
+          timeout: 60
+    - name: "toot:done"
+      shell: "/home/mastodon/.local/bin/toot post ':dogcited: 完了！！！ :dogcited:'"
