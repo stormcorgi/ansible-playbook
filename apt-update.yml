@@ -1,4 +1,4 @@
-- hosts: servers
+- hosts: "{{ target_hosts }}"
   become: true
   become_user: root
   tasks:

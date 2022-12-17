@@ -1,5 +1,5 @@
 ---
-- hosts: gotosocial
+- hosts: "{{ target_hosts }}"
   vars:
       live_path: /gotosocial
   become: true
@@ -25,9 +25,6 @@
       meta: end_play
       when: current_binary.stdout == json_response.json.tag_name
 
-    - name: "toot:start"
-      shell: "/usr/local/bin/toot post 'GoToSocial 鯖缶びちびち... {{  json_response.json.tag_name }}'"
-
     - name: install arm64 {{ json_response.json.tag_name}}
       loop: "{{ json_response.json.assets }}"
       when: "'arm64' in item.name"
@@ -46,9 +43,6 @@
 
     - debug: msg='new file found! {{ binary.changed }}'
 
-    - name: "toot:restart"
-      shell: "/usr/local/bin/toot post '再起動ッ！突っ込むぞッ！'"
-    
     - name: restart gotosocial.service
       ansible.builtin.service:
           name: gotosocial
@@ -56,10 +50,8 @@
       become: true
       become_method: sudo
       become_user: root
-    
+
     - name: sleep 10 sec
       ansible.builtin.wait_for:
           timeout: 10
 
-    - name: "toot:done"
-      shell: "/usr/local/bin/toot post ':dogcited: @mot 完了！！！ :dogcited:'"

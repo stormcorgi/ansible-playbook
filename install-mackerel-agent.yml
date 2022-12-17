@@ -1,5 +1,5 @@
 ---
-- hosts: servers
+- hosts: "{{ target_hosts }}"
   vars:
     apikey: hoge
   become: true

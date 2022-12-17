@@ -1,5 +1,5 @@
 ---
-- hosts: deneb
+- hosts: "{{ target_hosts }}"
   gather_facts: false
   become: true
 

@@ -1,5 +1,5 @@
 ---
-- hosts: mastodon
+- hosts: "{{ target_hosts }}"
   environment:
       NODE_OPTIONS: "--openssl-legacy-provider"
       RAILS_ENV: "production"

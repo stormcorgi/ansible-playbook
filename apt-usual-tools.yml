@@ -1,5 +1,5 @@
 ---
-- hosts: servers
+- hosts: "{{ target_hosts }}"
   gather_facts: false
   become: true
 
